@@ -4,7 +4,7 @@ import PresenceDot from './PresenceDot';
 const CHANNELS = ['general', 'engineering', 'design', 'random'];
 
 export default function Sidebar({ onLogout }) {
-  const { user, activeChannel, setActiveChannel, onlineUsers } = useStore();
+  const { user, activeChannel, setActiveChannel, onlineUsers, unreadCounts } = useStore();
 
   return (
     <div className="w-60 bg-[#080b10] border-r border-[#1e293b] flex flex-col h-screen">
@@ -23,15 +23,44 @@ export default function Sidebar({ onLogout }) {
       {/* Channels */}
       <div className="px-3 py-3 flex-1 overflow-y-auto">
         <div className="text-xs text-slate-600 px-2 mb-2 tracking-wider">CHANNELS</div>
-        {CHANNELS.map((ch) => (
-          <button key={ch} onClick={() => setActiveChannel(ch)}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-1 transition-colors
-              ${activeChannel === ch
-                ? 'bg-violet-600/20 text-violet-300 font-medium'
-                : 'text-slate-500 hover:text-slate-300 hover:bg-[#1e293b]'}`}>
-            # {ch}
-          </button>
-        ))}
+        {CHANNELS.map((ch) => {
+          const unread  = unreadCounts[ch] || 0;
+          const isActive = activeChannel === ch;
+
+          return (
+            <button key={ch} onClick={() => setActiveChannel(ch)}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-1 transition-colors
+                flex items-center justify-between group
+                ${isActive
+                  ? 'bg-violet-600/20 text-violet-300 font-medium'
+                  : unread > 0
+                    ? 'text-white font-semibold hover:bg-[#1e293b]'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-[#1e293b]'
+                }`}>
+              <span className="flex items-center gap-1.5">
+                {/* Unread indicator dot */}
+                {unread > 0 && !isActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                )}
+                {!unread && !isActive && (
+                  <span className="w-1.5 h-1.5 flex-shrink-0" /> 
+                )}
+                # {ch}
+              </span>
+
+              {/* Unread count badge */}
+              {unread > 0 && !isActive && (
+                <span className="
+                  bg-violet-500 text-white text-[10px] font-bold
+                  rounded-full min-w-[18px] h-[18px]
+                  flex items-center justify-center px-1
+                ">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
+            </button>
+          );
+        })}
 
         {/* Online Users */}
         <div className="text-xs text-slate-600 px-2 mt-5 mb-2 tracking-wider">

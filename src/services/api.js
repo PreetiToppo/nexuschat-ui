@@ -7,7 +7,7 @@ const api = axios.create({
 
 // Read token from Zustand memory, not localStorage
 api.interceptors.request.use((config) => {
-  const token = useStore.getState().accessToken;           // ← changed
+  const token = useStore.getState().accessToken;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -24,13 +24,11 @@ api.interceptors.response.use(
             'http://localhost:8080/api/auth/refresh',
             { refreshToken }
           );
-          // Save new access token to memory
           useStore.getState().setAuth(
             JSON.parse(localStorage.getItem('user')),
             data.accessToken,
-            refreshToken                                   // keep same refresh token
+            refreshToken
           );
-          // Retry original request with new token
           err.config.headers.Authorization = `Bearer ${data.accessToken}`;
           return api.request(err.config);
         } catch (refreshError) {
@@ -54,6 +52,8 @@ export const chatAPI = {
     api.get(`/api/channels/${channelId}/messages?limit=${limit}`),
   getPresence: (channelId) =>
     api.get(`/api/channels/${channelId}/presence`),
+  getAllOnlineUsers: () =>
+    api.get('/api/presence/online'),                    // ← new
 };
 
 export default api;
