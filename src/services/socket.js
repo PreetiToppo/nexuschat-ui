@@ -2,12 +2,14 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client/dist/sockjs.min.js';
 import useStore from '../store/useStore';
 
-let client            = null;
-let heartbeatTimer    = null;
-let isConnecting      = false;
-let currentSubscription = null;   // ← track active channel subscription
-let messageHandler    = null;     // ← store handler so switchChannel can reuse it
-let presenceHandler   = null;     // ← store handler so switchChannel can reuse it
+const CHANNELS = ['general', 'engineering', 'design', 'random'];
+
+let client             = null;
+let heartbeatTimer     = null;
+let isConnecting       = false;
+let currentSubscription = null;
+let messageHandler     = null;
+let presenceHandler    = null;
 
 export function connectSocket({ userId, username, channelId, onMessage, onPresence }) {
   if (isConnecting) return client;
@@ -20,7 +22,6 @@ export function connectSocket({ userId, username, channelId, onMessage, onPresen
     client = null;
   }
 
-  // Store handlers so switchChannel can reuse them
   messageHandler  = onMessage;
   presenceHandler = onPresence;
 
@@ -42,8 +43,20 @@ export function connectSocket({ userId, username, channelId, onMessage, onPresen
 
       if (!client?.connected) return;
 
-      // Subscribe to initial channel
-      subscribeToChannel(channelId);
+      // ── Subscribe to ALL channels at once ──────────────────────────
+      CHANNELS.forEach((ch) => {
+        client.subscribe(`/topic/channel/${ch}`, (msg) => {
+          try {
+            const data = JSON.parse(msg.body);
+            if (data.eventType === 'MESSAGE') {
+              messageHandler?.(data);   // ← pass ALL messages to handler
+            }
+          } catch (e) {
+            console.error('Failed to parse message', e);
+          }
+        });
+        console.log(`📡 Subscribed to #${ch}`);
+      });
 
       // Subscribe to presence
       client.subscribe('/topic/presence', (msg) => {
@@ -94,34 +107,15 @@ export function connectSocket({ userId, username, channelId, onMessage, onPresen
   return client;
 }
 
-// ── Switch channel without reconnecting ────────────────────────────────────
-function subscribeToChannel(channelId) {
-  // Unsubscribe from previous channel
-  if (currentSubscription) {
-    try { currentSubscription.unsubscribe(); } catch (e) {}
-    currentSubscription = null;
-  }
-
-  // Subscribe to new channel
-  currentSubscription = client.subscribe(
-    `/topic/channel/${channelId}`,
-    (msg) => {
-      try {
-        const data = JSON.parse(msg.body);
-        if (data.eventType === 'MESSAGE') messageHandler?.(data);
-      } catch (e) {}
-    }
-  );
-
-  console.log(`📡 Subscribed to channel: ${channelId}`);
-}
-
+// ── switchChannel now just tells ChatPage which channel is active ──────────
+// No need to resubscribe — already subscribed to all channels
 export function switchChannel(channelId) {
   if (!client?.connected) {
     console.warn('⚠️ Cannot switch channel — not connected');
     return;
   }
-  subscribeToChannel(channelId);
+  console.log(`🔀 Switched active channel to #${channelId}`);
+  // Nothing to do here — already subscribed to all channels
 }
 
 export function sendMessage({ channelId, senderId, senderUsername, content }) {
