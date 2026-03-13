@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { chatAPI } from '../services/api';
-import { connectSocket, disconnectSocket } from '../services/socket';
+import { connectSocket, disconnectSocket, switchChannel } from '../services/socket';
 import useStore from '../store/useStore';
 import Sidebar from '../components/Sidebar';
 import MessageList from '../components/MessageList';
@@ -13,24 +13,25 @@ export default function ChatPage() {
     setUserOnline, setUserOffline,
   } = useStore();
 
+  const connectedRef    = useRef(false); // ← track if socket is connected
+  const subscriptionRef = useRef(null);  // ← track current channel subscription
+
+  // ── Connect WebSocket ONCE on login ───────────────────────────────
   useEffect(() => {
-    if (!user) return;
+    if (!user || connectedRef.current) return;
 
-    // 1. Load message history
-    chatAPI.getMessages(activeChannel).then((res) => {
-      setMessages([...res.data].reverse());
-    }).catch(console.error);
+    // Mark current user online immediately
+    setUserOnline(user.userId, user.username);
 
-    // 2. Load EXISTING online users first ─────────────────── ← added
-    chatAPI.getPresence(activeChannel).then((res) => {
-      const onlineUsers = res.data; // { userId: username, ... }
-      Object.entries(onlineUsers).forEach(([uid, uname]) => {
+    // Fetch all online users
+    chatAPI.getAllOnlineUsers().then((res) => {
+      Object.entries(res.data).forEach(([uid, uname]) => {
         setUserOnline(uid, uname);
       });
     }).catch(console.error);
 
-    // 3. Connect WebSocket — listen for future presence changes
-    const socket = connectSocket({
+    // Connect socket ONCE
+    connectSocket({
       userId:    user.userId,
       username:  user.username,
       channelId: activeChannel,
@@ -42,7 +43,13 @@ export default function ChatPage() {
           setUserOffline(event.userId);
         }
       },
+      onConnected: (subscribeFn) => {
+        // Store the subscribe function so we can reuse it on channel switch
+        subscriptionRef.current = subscribeFn;
+      },
     });
+
+    connectedRef.current = true;
 
     return () => {
       disconnectSocket({
@@ -50,8 +57,23 @@ export default function ChatPage() {
         username:  user.username,
         channelId: activeChannel,
       });
+      connectedRef.current = false;
     };
-  }, [activeChannel, user]);
+  }, [user]); // ← only runs ONCE on login
+
+  // ── Switch channel subscription when activeChannel changes ────────
+  useEffect(() => {
+    if (!user || !connectedRef.current) return;
+
+    // Load message history for new channel
+    chatAPI.getMessages(activeChannel).then((res) => {
+      setMessages([...res.data].reverse());
+    }).catch(console.error);
+
+    // Switch channel subscription without reconnecting
+    switchChannel(activeChannel);
+
+  }, [activeChannel]); // ← runs on every channel switch
 
   function handleLogout() {
     disconnectSocket({
@@ -59,13 +81,13 @@ export default function ChatPage() {
       username:  user.username,
       channelId: activeChannel,
     });
+    connectedRef.current = false;
     logout();
   }
 
   return (
     <div className="flex h-screen bg-[#050508]">
       <Sidebar onLogout={handleLogout} />
-
       <div className="flex-1 flex flex-col min-w-0">
         <div className="px-6 py-4 border-b border-[#1e293b] bg-[#080b10] flex items-center gap-3">
           <span className="text-slate-400 font-medium">#</span>
@@ -74,7 +96,6 @@ export default function ChatPage() {
             Redis Pub/Sub · MongoDB · WebSocket
           </span>
         </div>
-
         <MessageList />
         <MessageInput />
       </div>
