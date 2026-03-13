@@ -1,15 +1,48 @@
 import axios from 'axios';
+import useStore from '../store/useStore';
 
 const api = axios.create({
   baseURL: 'http://localhost:8080',
 });
 
-// Auto-attach JWT token to every request
+// Read token from Zustand memory, not localStorage
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
+  const token = useStore.getState().accessToken;           // ← changed
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+// Auto-refresh when token expires
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    if (err.response?.status === 401) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          const { data } = await axios.post(
+            'http://localhost:8080/api/auth/refresh',
+            { refreshToken }
+          );
+          // Save new access token to memory
+          useStore.getState().setAuth(
+            JSON.parse(localStorage.getItem('user')),
+            data.accessToken,
+            refreshToken                                   // keep same refresh token
+          );
+          // Retry original request with new token
+          err.config.headers.Authorization = `Bearer ${data.accessToken}`;
+          return api.request(err.config);
+        } catch (refreshError) {
+          // Refresh token expired — force logout
+          useStore.getState().logout();
+          window.location.reload();
+        }
+      }
+    }
+    return Promise.reject(err);
+  }
+);
 
 export const authAPI = {
   register: (data) => api.post('/api/auth/register', data),

@@ -3,17 +3,18 @@ import { create } from 'zustand';
 const useStore = create((set) => ({
   // Auth
   user: JSON.parse(localStorage.getItem('user') || 'null'),
-  accessToken: localStorage.getItem('accessToken') || null,
+  accessToken: null,                                        // ← no longer from localStorage
 
-  setAuth: (user, accessToken) => {
+  setAuth: (user, accessToken, refreshToken) => {
     localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);     // ← persist refresh only
+    // accessToken stays in memory only
     set({ user, accessToken });
   },
 
   logout: () => {
     localStorage.removeItem('user');
-    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');                // ← changed from accessToken
     set({ user: null, accessToken: null });
   },
 
