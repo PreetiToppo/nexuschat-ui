@@ -13,16 +13,23 @@ export default function ChatPage() {
     setUserOnline, setUserOffline,
   } = useStore();
 
-  // Load history + connect WebSocket when channel changes
   useEffect(() => {
     if (!user) return;
 
-    // Load message history
+    // 1. Load message history
     chatAPI.getMessages(activeChannel).then((res) => {
       setMessages([...res.data].reverse());
     }).catch(console.error);
 
-    // Connect WebSocket
+    // 2. Load EXISTING online users first ─────────────────── ← added
+    chatAPI.getPresence(activeChannel).then((res) => {
+      const onlineUsers = res.data; // { userId: username, ... }
+      Object.entries(onlineUsers).forEach(([uid, uname]) => {
+        setUserOnline(uid, uname);
+      });
+    }).catch(console.error);
+
+    // 3. Connect WebSocket — listen for future presence changes
     const socket = connectSocket({
       userId:    user.userId,
       username:  user.username,
@@ -59,9 +66,7 @@ export default function ChatPage() {
     <div className="flex h-screen bg-[#050508]">
       <Sidebar onLogout={handleLogout} />
 
-      {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Channel header */}
         <div className="px-6 py-4 border-b border-[#1e293b] bg-[#080b10] flex items-center gap-3">
           <span className="text-slate-400 font-medium">#</span>
           <span className="font-semibold text-white">{activeChannel}</span>
