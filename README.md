@@ -1,16 +1,186 @@
-# React + Vite
+# ⚡ NexusChat — Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The frontend for NexusChat. Built with **React**, **Vite**, **Tailwind CSS**, and **STOMP WebSockets**. Features real-time messaging, presence indicators, and JWT-based authentication.
 
-Currently, two official plugins are available:
+> **Backend repo:** [nexuschat-server](https://github.com/your-username/nexuschat-server)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## ✨ Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Login / Register with JWT auth (persisted in `localStorage`)
+- Real-time messaging via WebSocket (STOMP over SockJS)
+- Typing indicators
+- Online presence — live green/grey dot per user
+- Multiple channels: `general`, `engineering`, `design`, `random`
+- Message history loaded on channel join
+- Auto-scroll to latest message
+- Responsive dark UI
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🛠️ Tech Stack
+
+| | |
+|---|---|
+| Framework | React 18 + Vite |
+| Styling | Tailwind CSS |
+| State | Zustand |
+| WebSocket | @stomp/stompjs + SockJS |
+| HTTP | Axios |
+| Date formatting | date-fns |
+
+---
+
+## ⚙️ Prerequisites
+
+- Node.js 18+
+- npm or yarn
+- [NexusChat Server](https://github.com/your-username/nexuschat-server) running on `localhost:8080`
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone
+
+```bash
+git clone https://github.com/your-username/nexuschat-client.git
+cd nexuschat-client
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Start dev server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173).
+
+### 4. Build for production
+
+```bash
+npm run build
+```
+
+---
+
+## 🔧 Configuration
+
+The backend URL is set in two places. Update both if your server runs elsewhere:
+
+**`src/services/api.js`** — REST base URL:
+```js
+const api = axios.create({
+  baseURL: 'http://localhost:8080',  // ← change this
+});
+```
+
+**`src/services/socket.js`** — WebSocket URL:
+```js
+webSocketFactory: () => new SockJS('http://localhost:8080/ws'),  // ← change this
+```
+
+---
+
+## 📁 Project Structure
+
+```
+src/
+├── components/
+│   ├── MessageInput.jsx     # Text input + send button
+│   ├── MessageList.jsx      # Scrollable message bubbles
+│   ├── PresenceDot.jsx      # Online/offline indicator dot
+│   └── Sidebar.jsx          # Channel list + online users
+├── pages/
+│   ├── LoginPage.jsx        # Login / Register tabs
+│   └── ChatPage.jsx         # Main chat layout + socket lifecycle
+├── services/
+│   ├── api.js               # Axios instance + auth/chat API calls
+│   └── socket.js            # STOMP connect, send, disconnect helpers
+├── store/
+│   └── useStore.js          # Zustand global state
+├── App.jsx                  # Auth gate — LoginPage vs ChatPage
+└── main.jsx                 # React root
+```
+
+---
+
+## 🗄️ State Management
+
+Global state lives in Zustand (`src/store/useStore.js`):
+
+| Slice | Fields | Description |
+|-------|--------|-------------|
+| Auth | `user`, `accessToken` | Persisted to `localStorage` |
+| Chat | `activeChannel`, `messages` | Cleared on channel switch |
+| Presence | `onlineUsers` | `{ userId: username }` map |
+
+---
+
+## 🔌 WebSocket Lifecycle
+
+Managed in `ChatPage.jsx` via `useEffect` on `activeChannel`:
+
+```
+Mount / channel change
+  → Load message history (REST GET)
+  → connectSocket()
+      ├── Subscribe /topic/channel/{channelId}  → addMessage()
+      ├── Subscribe /topic/presence             → setUserOnline/Offline()
+      ├── Publish presence.join
+      └── Start heartbeat interval (every 20s)
+
+Unmount / channel change
+  → Publish presence.leave
+  → Clear heartbeat
+  → client.deactivate()
+```
+
+---
+
+## 🎨 UI Overview
+
+```
+┌──────────────────────────────────────────────┐
+│  Sidebar (w-60)        │  Chat Area           │
+│  ─────────────         │  ──────────────────  │
+│  ⚡ NexusChat          │  # general           │
+│  ● alice               │                      │
+│                        │  [MessageList]        │
+│  CHANNELS              │                      │
+│  # general  ←active    │                      │
+│  # engineering         │                      │
+│  # design              │                      │
+│  # random              │  [MessageInput]       │
+│                        │                      │
+│  ONLINE — 2            │                      │
+│  ● alice               │                      │
+│  ● bob                 │                      │
+│                        │                      │
+│  Sign out              │                      │
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## 🔐 Auth Flow
+
+1. User registers or logs in via `/api/auth/register` or `/api/auth/login`
+2. `accessToken`, `userId`, and `username` are stored in `localStorage`
+3. Axios interceptor attaches `Authorization: Bearer <token>` to every request
+4. On logout, `localStorage` is cleared and state is reset
+
+> **Note:** Token refresh is not yet implemented. The access token expires after 15 minutes, at which point the user will need to log in again.
+
+---
+
+## 📄 License
+
+MIT
