@@ -21,7 +21,7 @@ api.interceptors.response.use(
       if (refreshToken) {
         try {
           const { data } = await axios.post(
-            'http://localhost:8080/api/auth/refresh',
+            'https://nexuschat-server-production.up.railway.app/api/auth/refresh',
             { refreshToken }
           );
           useStore.getState().setAuth(
