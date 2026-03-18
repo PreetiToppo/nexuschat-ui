@@ -2,7 +2,7 @@ import axios from 'axios';
 import useStore from '../store/useStore';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: 'https://nexuschat-server-production.up.railway.app',
 });
 
 // Read token from Zustand memory, not localStorage

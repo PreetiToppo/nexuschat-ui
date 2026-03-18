@@ -37,7 +37,7 @@ export default function SuggestionBar({ channelId, onSelect, visible }) {
     setStreamText('');
     setLoading(true);
 
-    const url = `http://localhost:8080/api/ai/suggest/${channelId}`;
+    const url = `https://nexuschat-server-production.up.railway.app/api/ai/suggest/${channelId}`;
     const es  = new EventSource(url);
     eventSourceRef.current = es;
 

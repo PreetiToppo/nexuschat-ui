@@ -29,7 +29,7 @@ export function connectSocket({ userId, username, channelId, onMessage, onPresen
   isConnecting      = true;
 
   client = new Client({
-    webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+    webSocketFactory: () => new SockJS('https://nexuschat-server-production.up.railway.app/ws'),
     connectHeaders: {
       userId,
       username,
